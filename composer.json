@@ -1,15 +1,8 @@
 {
-    "name": "venturecraft/revisionable",
+    "name": "omaximus/revisionable",
     "license": "MIT",
-    "description": "Keep a revision history for your models without thinking, created as a package for use with Laravel",
-    "keywords": ["model", "laravel", "ardent", "revision", "history"],
-    "homepage": "http://github.com/venturecraft/revisionable",
-    "authors": [
-        {
-            "name": "Chris Duell",
-            "email": "me@chrisduell.com"
-        }
-    ],
+    "description": "Fork of VentureCraft/revisionable",
+    "keywords": ["VentureCraft", "revisionable"],
     "support": {
         "issues": "https://github.com/VentureCraft/revisionable/issues",
         "source": "https://github.com/VentureCraft/revisionable"
