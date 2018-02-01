@@ -103,25 +103,37 @@ trait RevisionableTrait
     public static function classRevisionHistory($limit = 100, $order = 'desc')
     {
         return \Venturecraft\Revisionable\Revision::where('revisionable_type', get_called_class())
-            ->orderBy('updated_at', $order)->limit($limit)->get();
+                                                  ->orderBy('updated_at', $order)
+                                                  ->limit($limit)
+                                                  ->get();
     }
 
     /**
-    * Invoked before a model is saved. Return false to abort the operation.
-    *
-    * @return bool
-    */
+     * Invoked before a model is saved. Return false to abort the operation.
+     *
+     * @return bool
+     */
     public function preSave()
     {
         if (!isset($this->revisionEnabled) || $this->revisionEnabled) {
             // if there's no revisionEnabled. Or if there is, if it's true
 
+            $polymorphic = $this->buildPolymorphicKeys();
+            $polymorphicDotted = array_dot($polymorphic);
             $this->originalData = $this->original;
             $this->updatedData = $this->attributes;
 
             // we can only safely compare basic items,
             // so for now we drop any object based items, like DateTime
             foreach ($this->updatedData as $key => $val) {
+                if ($polymorphicKey = array_search($key, $polymorphicDotted)) {
+                    array_set($this->originalData, $polymorphicKey, $this->originalData[$key]);
+                    array_set($this->updatedData, $polymorphicKey, $val);
+                    unset($this->originalData[$key]);
+                    unset($this->updatedData[$key]);
+
+                }
+
                 if (gettype($val) == 'object' && !method_exists($val, '__toString')) {
                     unset($this->originalData[$key]);
                     unset($this->updatedData[$key]);
@@ -143,6 +155,16 @@ trait RevisionableTrait
             unset($this->attributes['keepRevisionOf']);
 
             $this->dirtyData = $this->getDirty();
+
+            foreach ($this->dirtyData as $key => $value) {
+                if ($polymorphicKey = array_search($key, $polymorphicDotted)) {
+                    $arrayKey = substr($polymorphicKey, 0, strpos($polymorphicKey, '.'));
+                    array_set($this->dirtyData, $arrayKey, $this->originalData[$arrayKey]);
+                    array_set($this->dirtyData, $polymorphicKey, $value);
+                    unset($this->dirtyData[$key]);
+                }
+            }
+
             $this->updating = $this->exists;
         }
     }
@@ -179,8 +201,8 @@ trait RevisionableTrait
                     'revisionable_type' => $this->getMorphClass(),
                     'revisionable_id' => $this->getKey(),
                     'key' => $key,
-                    'old_value' => array_get($this->originalData, $key),
-                    'new_value' => $this->updatedData[$key],
+                    'old_value' => $this->formatRevisionableValue(array_get($this->originalData, $key)),
+                    'new_value' => $this->formatRevisionableValue($this->updatedData[$key]),
                     'user_id' => $this->getSystemUserId(),
                     'created_at' => new \DateTime(),
                     'updated_at' => new \DateTime(),
@@ -202,8 +224,8 @@ trait RevisionableTrait
     }
 
     /**
-    * Called after record successfully created
-    */
+     * Called after record successfully created
+     */
     public function postCreate()
     {
 
@@ -294,7 +316,7 @@ trait RevisionableTrait
         foreach ($this->dirtyData as $key => $value) {
             // check that the field is revisionable, and double check
             // that it's actually new data in case dirty is, well, clean
-            if ($this->isRevisionable($key) && !is_array($value)) {
+            if ($this->isRevisionable($key)) {
                 if (!isset($this->originalData[$key]) || $this->originalData[$key] != $this->updatedData[$key]) {
                     $changes_to_record[$key] = $value;
                 }
@@ -351,6 +373,36 @@ trait RevisionableTrait
         }
 
         return false;
+    }
+
+    private function buildPolymorphicKeys()
+    {
+        $revisionPolymorphic = $this->revisionPolymorphic ?? [];
+        $polymorphic = [];
+        foreach ($revisionPolymorphic as $key => $name) {
+            if (is_string($name)) {
+                $polymorphic[$name] = [
+                    'id' => "{$name}_id",
+                    'type' => "{$name}_type",
+                ];
+            } else {
+                $polymorphic[$key] = [
+                    'id' => $name['id'],
+                    'type' => $name['type'],
+                ];
+            }
+        }
+
+        return $polymorphic;
+    }
+
+    private function formatRevisionableValue($value)
+    {
+        if (is_array($value)) {
+            $value = json_encode($value);
+        }
+
+        return $value;
     }
 
     /**
