@@ -172,6 +172,10 @@ class Revision extends Eloquent
                         return $this->format($this->key, $item->identifiableName());
                     }
                 }
+
+                if ($value = $this->morph($which_value)) {
+                    return $this->format($this->key, $value);
+                }
             } catch (\Exception $e) {
                 // Just a fail-safe, in the case the data setup isn't as expected
                 // Nothing to do here.
@@ -299,5 +303,25 @@ class Revision extends Eloquent
         }
 
         return $this->revisionable_type;
+    }
+
+    public function morph($value)
+    {
+        $related_model = $this->getRevisionableType();
+        $related_model = new $related_model;
+        $polymorphic = $related_model->getRevisionPolymorphicFields() ?? [];
+
+        if (!in_array($this->key, $polymorphic) && !isset($polymorphic[$this->key])) {
+            return false;
+        }
+
+        $data = json_decode($this->$value);
+        $polymorphicClass = Relation::getMorphedModel($data->type);
+
+        if (!method_exists($polymorphicClass, 'identifiableName')) {
+            return $data->id;
+        }
+
+        return $polymorphicInstance = $polymorphicClass::find($data->id)->identifiableName();
     }
 }

@@ -462,6 +462,11 @@ trait RevisionableTrait
         return isset($this->revisionUnknownString) ? $this->revisionUnknownString : 'unknown';
     }
 
+    public function getRevisionPolymorphicFields()
+    {
+        return $this->revisionPolymorphic;
+    }
+
     /**
      * Disable a revisionable field temporarily
      * Need to do the adding to array longhanded, as there's a
