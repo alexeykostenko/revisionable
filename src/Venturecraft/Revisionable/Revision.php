@@ -316,6 +316,11 @@ class Revision extends Eloquent
         }
 
         $data = json_decode($this->$value);
+
+        if (!$data) {
+            return null;
+        }
+
         $polymorphicClass = Relation::getMorphedModel($data->type);
 
         if (!method_exists($polymorphicClass, 'identifiableName')) {
