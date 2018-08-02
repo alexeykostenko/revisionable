@@ -327,6 +327,8 @@ class Revision extends Eloquent
             return $data->id;
         }
 
-        return $polymorphicInstance = $polymorphicClass::find($data->id)->identifiableName();
+        $polymorphicInstance = $polymorphicClass::find($data->id);
+
+        return $polymorphicInstance ? $polymorphicInstance->identifiableName() : null;
     }
 }
