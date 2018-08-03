@@ -162,7 +162,7 @@ class Revision extends Eloquent
                     }
 
                     // Check if model use RevisionableTrait
-                    if(method_exists($item, 'identifiableName')) {
+                    if (method_exists($item, 'identifiableName')) {
                         // see if there's an available mutator
                         $mutator = 'get' . studly_case($this->key) . 'Attribute';
                         if (method_exists($item, $mutator)) {
@@ -233,7 +233,9 @@ class Revision extends Eloquent
      */
     public function userResponsible()
     {
-        if (empty($this->user_id)) { return false; }
+        if (empty($this->user_id)) {
+            return false;
+        }
         if (class_exists($class = '\Cartalyst\Sentry\Facades\Laravel\Sentry')
             || class_exists($class = '\Cartalyst\Sentinel\Laravel\Facades\Sentinel')
         ) {
@@ -250,6 +252,7 @@ class Revision extends Eloquent
             if (!class_exists($user_model)) {
                 return false;
             }
+
             return $user_model::find($this->user_id);
         }
     }
@@ -327,8 +330,6 @@ class Revision extends Eloquent
             return $data->id;
         }
 
-        $polymorphicInstance = $polymorphicClass::find($data->id);
-
-        return $polymorphicInstance ? $polymorphicInstance->identifiableName() : null;
+        return $polymorphicClass::withTrashed()->find($data->id)->identifiableName();
     }
 }
