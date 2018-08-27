@@ -244,7 +244,10 @@ class Revision extends Eloquent
             $user_model = app('config')->get('auth.model');
 
             if (empty($user_model)) {
-                $user_model = app('config')->get('auth.providers.users.model');
+                $guard = config('auth.defaults.guard');
+                $provider = config("auth.guards.{$guard}.provider");
+                $user_model = config("auth.providers.{$provider}.model");
+
                 if (empty($user_model)) {
                     return false;
                 }
