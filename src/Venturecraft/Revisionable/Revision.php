@@ -305,10 +305,10 @@ class Revision extends Eloquent
     protected function getRevisionableType()
     {
         if (method_exists(Relation::class, 'getMorphedModel')) {
-            return Relation::getMorphedModel($this->revisionable_type);
+            $type = Relation::getMorphedModel($this->revisionable_type);
         }
 
-        return $this->revisionable_type;
+        return $type ?: $this->revisionable_type;
     }
 
     public function morph($value)

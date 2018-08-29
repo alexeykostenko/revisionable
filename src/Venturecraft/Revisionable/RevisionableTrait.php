@@ -410,7 +410,7 @@ trait RevisionableTrait
      */
     public function getRevisionFormattedFields()
     {
-        return $this->revisionFormattedFields;
+        return isset($this->revisionFormattedFields) ? $this->revisionFormattedFields : [];
     }
 
     /**
@@ -418,7 +418,7 @@ trait RevisionableTrait
      */
     public function getRevisionFormattedFieldNames()
     {
-        return $this->revisionFormattedFieldNames;
+        return isset($this->revisionFormattedFieldNames) ? $this->revisionFormattedFieldNames : [];
     }
 
     /**
