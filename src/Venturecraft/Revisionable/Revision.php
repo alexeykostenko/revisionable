@@ -13,6 +13,30 @@ use Illuminate\Support\Facades\Log;
  * any model that extends this model
  *
  * (c) Venture Craft <http://www.venturecraft.com.au>
+ *
+ * @property int $id
+ * @property string $revisionable_type
+ * @property int $revisionable_id
+ * @property int|null $user_id
+ * @property string $key
+ * @property string|null $old_value
+ * @property string|null $new_value
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $revisionable
+ * @method static \Illuminate\Database\Eloquent\Builder|\Venturecraft\Revisionable\Revision newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|\Venturecraft\Revisionable\Revision newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|\Venturecraft\Revisionable\Revision query()
+ * @method static \Illuminate\Database\Eloquent\Builder|\Venturecraft\Revisionable\Revision whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\Venturecraft\Revisionable\Revision whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\Venturecraft\Revisionable\Revision whereKey($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\Venturecraft\Revisionable\Revision whereNewValue($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\Venturecraft\Revisionable\Revision whereOldValue($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\Venturecraft\Revisionable\Revision whereRevisionableId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\Venturecraft\Revisionable\Revision whereRevisionableType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\Venturecraft\Revisionable\Revision whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\Venturecraft\Revisionable\Revision whereUserId($value)
+ * @mixin \Eloquent
  */
 class Revision extends Eloquent
 {
@@ -24,22 +48,14 @@ class Revision extends Eloquent
     /**
      * @var array
      */
-    protected $revisionFormattedFields = array();
-
-    /**
-     * @param array $attributes
-     */
-    public function __construct(array $attributes = array())
-    {
-        parent::__construct($attributes);
-    }
+    protected $revisionFormattedFields = [];
 
     /**
      * Revisionable.
      *
      * Grab the revision history for the model that is calling
      *
-     * @return array revision history
+     * @return \Illuminate\Database\Eloquent\Relations\MorphTo
      */
     public function revisionable()
     {
@@ -76,9 +92,9 @@ class Revision extends Eloquent
      */
     private function formatFieldName($key)
     {
-        $related_model = $this->getRevisionableType();
-        $related_model = new $related_model;
-        $revisionFormattedFieldNames = $related_model->getRevisionFormattedFieldNames();
+        $relatedModel = $this->getRevisionableType();
+        $relatedModel = new $relatedModel;
+        $revisionFormattedFieldNames = $relatedModel->getRevisionFormattedFieldNames();
 
         if (isset($revisionFormattedFieldNames[$key])) {
             return $revisionFormattedFieldNames[$key];
@@ -119,44 +135,44 @@ class Revision extends Eloquent
      * Responsible for actually doing the grunt work for getting the
      * old or new value for the revision.
      *
-     * @param  string $which old or new
+     * @param string $which old or new
      *
      * @return string value
      */
     private function getValue($which = 'new')
     {
-        $which_value = $which . '_value';
+        $whichValue = $which . '_value';
 
         // First find the main model that was updated
-        $main_model = $this->getRevisionableType();
+        $mainModel = $this->getRevisionableType();
         // Load it, WITH the related model
-        if (class_exists($main_model)) {
-            $main_model = new $main_model;
+        if (class_exists($mainModel)) {
+            $mainModel = new $mainModel;
 
             try {
                 if ($this->isRelated()) {
-                    $related_model = $this->getRelatedModel();
+                    $relatedModel = $this->getRelatedModel();
 
                     // Now we can find out the namespace of of related model
-                    if (!method_exists($main_model, $related_model)) {
-                        $related_model = camel_case($related_model); // for cases like published_status_id
-                        if (!method_exists($main_model, $related_model)) {
-                            throw new \Exception('Relation ' . $related_model . ' does not exist for ' . $main_model);
+                    if (!method_exists($mainModel, $relatedModel)) {
+                        $relatedModel = camel_case($relatedModel); // for cases like published_status_id
+                        if (!method_exists($mainModel, $relatedModel)) {
+                            throw new \Exception('Relation ' . $relatedModel . ' does not exist for ' . $mainModel);
                         }
                     }
-                    $related_class = $main_model->$related_model()->getRelated();
+                    $relatedClass = $mainModel->$relatedModel()->getRelated();
 
                     // Finally, now that we know the namespace of the related model
                     // we can load it, to find the information we so desire
-                    $item = $related_class::find($this->$which_value);
+                    $item = $relatedClass::find($this->$whichValue);
 
-                    if (is_null($this->$which_value) || $this->$which_value == '') {
-                        $item = new $related_class;
+                    if (is_null($this->$whichValue) || $this->$whichValue == '') {
+                        $item = new $relatedClass;
 
                         return $item->getRevisionNullString();
                     }
                     if (!$item) {
-                        $item = new $related_class;
+                        $item = new $relatedClass;
 
                         return $this->format($this->key, $item->getRevisionUnknownString());
                     }
@@ -173,7 +189,7 @@ class Revision extends Eloquent
                     }
                 }
 
-                if ($value = $this->morph($which_value)) {
+                if ($value = $this->morph($whichValue)) {
                     return $this->format($this->key, $value);
                 }
             } catch (\Exception $e) {
@@ -186,12 +202,12 @@ class Revision extends Eloquent
             // or, if it's a normal value
 
             $mutator = 'get' . studly_case($this->key) . 'Attribute';
-            if (method_exists($main_model, $mutator)) {
-                return $this->format($this->key, $main_model->$mutator($this->$which_value));
+            if (method_exists($mainModel, $mutator)) {
+                return $this->format($this->key, $mainModel->$mutator($this->$whichValue));
             }
         }
 
-        return $this->format($this->key, $this->$which_value);
+        return $this->format($this->key, $this->$whichValue);
     }
 
     /**
@@ -229,7 +245,7 @@ class Revision extends Eloquent
     /**
      * User Responsible.
      *
-     * @return User user responsible for the change
+     * @return \Illuminate\Contracts\Auth\Authenticatable|bool user responsible for the change
      */
     public function userResponsible()
     {
@@ -241,22 +257,22 @@ class Revision extends Eloquent
         ) {
             return $class::findUserById($this->user_id);
         } else {
-            $user_model = app('config')->get('auth.model');
+            $userModel = app('config')->get('auth.model');
 
-            if (empty($user_model)) {
+            if (empty($userModel)) {
                 $guard = config('auth.defaults.guard');
                 $provider = config("auth.guards.{$guard}.provider");
-                $user_model = config("auth.providers.{$provider}.model");
+                $userModel = config("auth.providers.{$provider}.model");
 
-                if (empty($user_model)) {
+                if (empty($userModel)) {
                     return false;
                 }
             }
-            if (!class_exists($user_model)) {
+            if (!class_exists($userModel)) {
                 return false;
             }
 
-            return $user_model::find($this->user_id);
+            return $userModel::find($this->user_id);
         }
     }
 
@@ -291,9 +307,9 @@ class Revision extends Eloquent
      */
     public function format($key, $value)
     {
-        $related_model = $this->getRevisionableType();
-        $related_model = new $related_model;
-        $revisionFormattedFields = $related_model->getRevisionFormattedFields();
+        $relatedModel = $this->getRevisionableType();
+        $relatedModel = new $relatedModel;
+        $revisionFormattedFields = $relatedModel->getRevisionFormattedFields();
 
         if (isset($revisionFormattedFields[$key])) {
             return FieldFormatter::format($key, $value, $revisionFormattedFields);
@@ -308,14 +324,14 @@ class Revision extends Eloquent
             $type = Relation::getMorphedModel($this->revisionable_type);
         }
 
-        return $type ?: $this->revisionable_type;
+        return $type ?? $this->revisionable_type;
     }
 
     public function morph($value)
     {
-        $related_model = $this->getRevisionableType();
-        $related_model = new $related_model;
-        $polymorphic = $related_model->getRevisionPolymorphicFields() ?? [];
+        $relatedModel = $this->getRevisionableType();
+        $relatedModel = new $relatedModel;
+        $polymorphic = $relatedModel->getRevisionPolymorphicFields() ?? [];
 
         if (!in_array($this->key, $polymorphic) && !isset($polymorphic[$this->key])) {
             return false;
