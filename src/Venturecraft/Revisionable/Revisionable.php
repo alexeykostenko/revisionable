@@ -1,4 +1,6 @@
-<?php namespace Venturecraft\Revisionable;
+<?php
+
+namespace Venturecraft\Revisionable;
 
 use Illuminate\Database\Eloquent\Model as Eloquent;
 use Illuminate\Support\Arr;
