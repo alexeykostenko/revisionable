@@ -2,6 +2,8 @@
 
 namespace Venturecraft\Revisionable;
 
+use DateTime;
+
 /*
  * This file is part of the Revisionable package by Venture Craft
  *
@@ -121,7 +123,7 @@ trait RevisionableTrait
      */
     public function preSave()
     {
-        if (!isset($this->revisionEnabled) || $this->revisionEnabled) {
+        if ($this->isRevisionEnabled()) {
             // if there's no revisionEnabled. Or if there is, if it's true
 
             $polymorphic = $this->buildPolymorphicKeys();
@@ -184,25 +186,26 @@ trait RevisionableTrait
     public function postSave()
     {
         if (isset($this->historyLimit) && $this->revisionHistory()->count() >= $this->historyLimit) {
-            $LimitReached = true;
+            $limitReached = true;
         } else {
-            $LimitReached = false;
+            $limitReached = false;
         }
+
         if (isset($this->revisionCleanup)) {
-            $RevisionCleanup = $this->revisionCleanup;
+            $revisionCleanup = $this->revisionCleanup;
         } else {
-            $RevisionCleanup = false;
+            $revisionCleanup = false;
         }
 
         // check if the model already exists
-        if (((!isset($this->revisionEnabled) || $this->revisionEnabled) && $this->updating) && (!$LimitReached || $RevisionCleanup)) {
+        if (($this->isRevisionEnabled() && $this->updating) && (!$limitReached || $revisionCleanup)) {
             // if it does, it means we're updating
 
-            $changes_to_record = $this->changedRevisionableFields();
+            $changesToRecord = $this->changedRevisionableFields();
 
             $revisions = [];
 
-            foreach ($changes_to_record as $key => $change) {
+            foreach ($changesToRecord as $key => $change) {
                 $revisions[] = [
                     'revisionable_type' => $this->getMorphClass(),
                     'revisionable_id'   => $this->getKey(),
@@ -210,13 +213,13 @@ trait RevisionableTrait
                     'old_value'         => $this->formatRevisionableValue(Arr::get($this->originalData, $key)),
                     'new_value'         => $this->formatRevisionableValue($this->updatedData[$key]),
                     'user_id'           => $this->getSystemUserId(),
-                    'created_at'        => new \DateTime(),
-                    'updated_at'        => new \DateTime(),
+                    'created_at'        => new DateTime(),
+                    'updated_at'        => new DateTime(),
                 ];
             }
 
             if (count($revisions) > 0) {
-                if ($LimitReached && $RevisionCleanup) {
+                if ($limitReached && $revisionCleanup) {
                     $toDelete = $this->revisionHistory()->orderBy('id', 'asc')->limit(count($revisions))->get();
                     foreach ($toDelete as $delete) {
                         $delete->delete();
@@ -242,7 +245,7 @@ trait RevisionableTrait
             return false;
         }
 
-        if ((!isset($this->revisionEnabled) || $this->revisionEnabled)) {
+        if ($this->isRevisionEnabled()) {
             $revisions[] = [
                 'revisionable_type' => $this->getMorphClass(),
                 'revisionable_id'   => $this->getKey(),
@@ -250,8 +253,8 @@ trait RevisionableTrait
                 'old_value'         => null,
                 'new_value'         => $this->{self::CREATED_AT},
                 'user_id'           => $this->getSystemUserId(),
-                'created_at'        => new \DateTime(),
-                'updated_at'        => new \DateTime(),
+                'created_at'        => new DateTime(),
+                'updated_at'        => new DateTime(),
             ];
 
             $revision = new Revision;
@@ -266,7 +269,7 @@ trait RevisionableTrait
      */
     public function postDelete()
     {
-        if ((!isset($this->revisionEnabled) || $this->revisionEnabled)
+        if ($this->isRevisionEnabled()
             && $this->isSoftDelete()
             && $this->isRevisionable($this->getDeletedAtColumn())
         ) {
@@ -277,8 +280,8 @@ trait RevisionableTrait
                 'old_value'         => null,
                 'new_value'         => $this->{$this->getDeletedAtColumn()},
                 'user_id'           => $this->getSystemUserId(),
-                'created_at'        => new \DateTime(),
-                'updated_at'        => new \DateTime(),
+                'created_at'        => new DateTime(),
+                'updated_at'        => new DateTime(),
             ];
             $revision = new \Venturecraft\Revisionable\Revision;
             \DB::table($revision->getTable())->insert($revisions);
@@ -316,13 +319,13 @@ trait RevisionableTrait
      */
     private function changedRevisionableFields()
     {
-        $changes_to_record = [];
+        $changesToRecord = [];
         foreach ($this->dirtyData as $key => $value) {
             // check that the field is revisionable, and double check
             // that it's actually new data in case dirty is, well, clean
             if ($this->isRevisionable($key)) {
                 if (!isset($this->originalData[$key]) || $this->originalData[$key] != $this->updatedData[$key]) {
-                    $changes_to_record[$key] = $value;
+                    $changesToRecord[$key] = $value;
                 }
             } else {
                 // we don't need these any more, and they could
@@ -332,7 +335,7 @@ trait RevisionableTrait
             }
         }
 
-        return $changes_to_record;
+        return $changesToRecord;
     }
 
     /**
@@ -495,5 +498,15 @@ trait RevisionableTrait
             $this->dontKeepRevisionOf = $donts;
             unset($donts);
         }
+    }
+
+    /**
+     * If there's no revisionEnabled. Or if there is, if it's true.
+     *
+     * @return bool
+     */
+    public function isRevisionEnabled()
+    {
+        return (!isset($this->revisionEnabled) || $this->revisionEnabled);
     }
 }

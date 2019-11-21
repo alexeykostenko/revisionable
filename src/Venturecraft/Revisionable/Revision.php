@@ -4,6 +4,7 @@ namespace Venturecraft\Revisionable;
 
 use Illuminate\Database\Eloquent\Model as Eloquent;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -155,7 +156,7 @@ class Revision extends Eloquent
 
                     // Now we can find out the namespace of of related model
                     if (!method_exists($mainModel, $relatedModel)) {
-                        $relatedModel = camel_case($relatedModel); // for cases like published_status_id
+                        $relatedModel = Str::camel($relatedModel); // for cases like published_status_id
                         if (!method_exists($mainModel, $relatedModel)) {
                             throw new \Exception('Relation ' . $relatedModel . ' does not exist for ' . $mainModel);
                         }
@@ -180,7 +181,7 @@ class Revision extends Eloquent
                     // Check if model use RevisionableTrait
                     if (method_exists($item, 'identifiableName')) {
                         // see if there's an available mutator
-                        $mutator = 'get' . studly_case($this->key) . 'Attribute';
+                        $mutator = 'get' . Str::studly($this->key) . 'Attribute';
                         if (method_exists($item, $mutator)) {
                             return $this->format($item->$mutator($this->key), $item->identifiableName());
                         }
@@ -201,7 +202,7 @@ class Revision extends Eloquent
             // if there was an issue
             // or, if it's a normal value
 
-            $mutator = 'get' . studly_case($this->key) . 'Attribute';
+            $mutator = 'get' . Str::studly($this->key) . 'Attribute';
             if (method_exists($mainModel, $mutator)) {
                 return $this->format($this->key, $mainModel->$mutator($this->$whichValue));
             }
@@ -292,10 +293,10 @@ class Revision extends Eloquent
 
     /*
      * Examples:
-    array(
+    [
         'public' => 'boolean:Yes|No',
         'minimum'  => 'string:Min: %s'
-    )
+    ]
      */
     /**
      * Format the value according to the $revisionFormattedFields array.
