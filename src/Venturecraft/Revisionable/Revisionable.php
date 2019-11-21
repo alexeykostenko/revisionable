@@ -2,6 +2,7 @@
 
 namespace Venturecraft\Revisionable;
 
+use DateTime;
 use Illuminate\Database\Eloquent\Model as Eloquent;
 use Illuminate\Support\Arr;
 
@@ -36,19 +37,19 @@ class Revisionable extends Eloquent
     /**
      * @var array
      */
-    private $dontKeep = array();
+    private $dontKeep = [];
 
     /**
      * @var array
      */
-    private $doKeep = array();
+    private $doKeep = [];
 
     /**
      * Keeps the list of values that have been updated
      *
      * @var array
      */
-    protected $dirtyData = array();
+    protected $dirtyData = [];
 
     /**
      * Create the event listeners for the saving and saved events
@@ -92,7 +93,7 @@ class Revisionable extends Eloquent
      */
     public function preSave()
     {
-        if (!isset($this->revisionEnabled) || $this->revisionEnabled) {
+        if ($this->isRevisionEnabled()) {
             // if there's no revisionEnabled. Or if there is, if it's true
 
             $this->originalData = $this->original;
@@ -135,24 +136,24 @@ class Revisionable extends Eloquent
     {
 
         // check if the model already exists
-        if ((!isset($this->revisionEnabled) || $this->revisionEnabled) && $this->updating) {
+        if ($this->isRevisionEnabled() && $this->updating) {
             // if it does, it means we're updating
 
-            $changes_to_record = $this->changedRevisionableFields();
+            $changesToRecord = $this->changedRevisionableFields();
 
-            $revisions = array();
+            $revisions = [];
 
-            foreach ($changes_to_record as $key => $change) {
-                $revisions[] = array(
+            foreach ($changesToRecord as $key => $change) {
+                $revisions[] = [
                     'revisionable_type'     => $this->getMorphClass(),
                     'revisionable_id'       => $this->getKey(),
                     'key'                   => $key,
                     'old_value'             => Arr::get($this->originalData, $key),
                     'new_value'             => $this->updatedData[$key],
                     'user_id'               => $this->getSystemUserId(),
-                    'created_at'            => new \DateTime(),
-                    'updated_at'            => new \DateTime(),
-                );
+                    'created_at'            => new DateTime(),
+                    'updated_at'            => new DateTime(),
+                ];
             }
 
             if (count($revisions) > 0) {
@@ -176,18 +177,18 @@ class Revisionable extends Eloquent
             return false;
         }
 
-        if ((!isset($this->revisionEnabled) || $this->revisionEnabled))
+        if ($this->isRevisionEnabled())
         {
-            $revisions[] = array(
+            $revisions[] = [
                 'revisionable_type' => $this->getMorphClass(),
                 'revisionable_id' => $this->getKey(),
                 'key' => self::CREATED_AT,
                 'old_value' => null,
                 'new_value' => $this->{self::CREATED_AT},
                 'user_id' => $this->getSystemUserId(),
-                'created_at' => new \DateTime(),
-                'updated_at' => new \DateTime(),
-            );
+                'created_at' => new DateTime(),
+                'updated_at' => new DateTime(),
+            ];
 
             $revision = new Revision;
             \DB::table($revision->getTable())->insert($revisions);
@@ -200,19 +201,19 @@ class Revisionable extends Eloquent
      */
     public function postDelete()
     {
-        if ((!isset($this->revisionEnabled) || $this->revisionEnabled)
+        if ($this->isRevisionEnabled()
             && $this->isSoftDelete()
             && $this->isRevisionable($this->getDeletedAtColumn())) {
-            $revisions[] = array(
+            $revisions[] = [
                 'revisionable_type' => $this->getMorphClass(),
                 'revisionable_id' => $this->getKey(),
                 'key' => $this->getDeletedAtColumn(),
                 'old_value' => null,
                 'new_value' => $this->{$this->getDeletedAtColumn()},
                 'user_id' => $this->getSystemUserId(),
-                'created_at' => new \DateTime(),
-                'updated_at' => new \DateTime(),
-            );
+                'created_at' => new DateTime(),
+                'updated_at' => new DateTime(),
+            ];
             $revision = new \Venturecraft\Revisionable\Revision;
             \DB::table($revision->getTable())->insert($revisions);
         }
@@ -246,13 +247,13 @@ class Revisionable extends Eloquent
      */
     private function changedRevisionableFields()
     {
-        $changes_to_record = array();
+        $changesToRecord = [];
         foreach ($this->dirtyData as $key => $value) {
             // check that the field is revisionable, and double check
             // that it's actually new data in case dirty is, well, clean
             if ($this->isRevisionable($key) && !is_array($value)) {
                 if (!isset($this->originalData[$key]) || $this->originalData[$key] != $this->updatedData[$key]) {
-                    $changes_to_record[$key] = $value;
+                    $changesToRecord[$key] = $value;
                 }
             } else {
                 // we don't need these any more, and they could
@@ -262,7 +263,7 @@ class Revisionable extends Eloquent
             }
         }
 
-        return $changes_to_record;
+        return $changesToRecord;
     }
 
     /**
@@ -349,7 +350,7 @@ class Revisionable extends Eloquent
      */
     public function getRevisionNullString()
     {
-        return isset($this->revisionNullString)?$this->revisionNullString:'nothing';
+        return isset($this->revisionNullString) ? $this->revisionNullString : 'nothing';
     }
 
     /**
@@ -362,7 +363,7 @@ class Revisionable extends Eloquent
      */
     public function getRevisionUnknownString()
     {
-        return isset($this->revisionUnknownString)?$this->revisionUnknownString:'unknown';
+        return isset($this->revisionUnknownString) ? $this->revisionUnknownString : 'unknown';
     }
 
     /**
@@ -377,7 +378,7 @@ class Revisionable extends Eloquent
     public function disableRevisionField($field)
     {
         if (!isset($this->dontKeepRevisionOf)) {
-            $this->dontKeepRevisionOf = array();
+            $this->dontKeepRevisionOf = [];
         }
         if (is_array($field)) {
             foreach ($field as $one_field) {
@@ -389,5 +390,15 @@ class Revisionable extends Eloquent
             $this->dontKeepRevisionOf = $donts;
             unset($donts);
         }
+    }
+
+    /**
+     * If there's no revisionEnabled. Or if there is, if it's true.
+     *
+     * @return bool
+     */
+    public function isRevisionEnabled()
+    {
+        return (!isset($this->revisionEnabled) || $this->revisionEnabled);
     }
 }
